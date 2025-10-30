@@ -1,0 +1,446 @@
+<!DOCTYPE html><html lang="en"><head><meta name="x-poe-datastore-behavior" content="local_only"><meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://code.jquery.com https://unpkg.com https://d3js.org https://threejs.org https://cdn.plot.ly https://stackpath.bootstrapcdn.com https://maps.googleapis.com https://cdn.tailwindcss.com https://ajax.googleapis.com https://kit.fontawesome.com https://cdn.datatables.net https://maxcdn.bootstrapcdn.com https://code.highcharts.com https://tako-static-assets-production.s3.amazonaws.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://pfst.cf2.poecdn.net https://puc.poecdn.net https://i.imgur.com https://wikimedia.org https://*.icons8.com https://*.giphy.com https://picsum.photos https://images.unsplash.com; frame-src 'self' https://www.youtube.com https://trytako.com; child-src 'self'; manifest-src 'self'; worker-src 'self'; upgrade-insecure-requests; block-all-mixed-content;">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Organizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+        .file-item:hover {
+            transform: translateX(4px);
+            transition: transform 0.2s ease;
+        }
+    </style>
+<script src="https://puc.poecdn.net/authenticated_preview_page/syncedState.3f7572448765332f3047.js"></script></head>
+<body class="bg-white dark:bg-[#181818] min-h-screen transition-colors duration-200">
+    <div class="max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="text-center mb-8 slide-in">
+            <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+                📁 File Organizer
+            </h1>
+            <p class="text-gray-600 dark:text-gray-400 text-base">
+                Automatically organize your files into categorized folders
+            </p>
+        </div>
+
+        <!-- Main Card -->
+        <div class="bg-gray-50 dark:bg-gray-900 rounded-2xl shadow-xl p-6 sm:p-8 mb-6 slide-in">
+            <!-- Select Directory Button -->
+            <div id="selectSection" class="text-center">
+                <button id="selectDirBtn" class="px-8 py-4 bg-primary hover:bg-opacity-90 text-white text-base font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg">
+                    📂 Select Directory to Organize
+                </button>
+                <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                    Choose a folder to scan and organize its files
+                </p>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingSection" class="hidden text-center">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+                <p class="mt-4 text-gray-700 dark:text-gray-300 text-base">Scanning files...</p>
+            </div>
+
+            <!-- Results Section -->
+            <div id="resultsSection" class="hidden">
+                <!-- Summary -->
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                        Scan Results
+                    </h2>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg text-center">
+                            <div class="text-3xl font-bold text-primary" id="totalFiles">0</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">Total Files</div>
+                        </div>
+                        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg text-center">
+                            <div class="text-3xl font-bold text-green-500" id="categorizedFiles">0</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">To Organize</div>
+                        </div>
+                        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg text-center">
+                            <div class="text-3xl font-bold text-blue-500" id="categoryCount">0</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">Categories</div>
+                        </div>
+                        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg text-center">
+                            <div class="text-3xl font-bold text-purple-500" id="nestedFiles">0</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">In Subfolders</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- File Categories -->
+                <div id="categoriesContainer" class="space-y-4 mb-6">
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                    <button id="organizeBtn" class="px-6 py-3 bg-primary hover:bg-opacity-90 text-white text-base font-semibold rounded-xl transition-all duration-200 shadow-md">
+                        ✨ Organize Files
+                    </button>
+                    <button id="scanAgainBtn" class="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white text-base font-semibold rounded-xl transition-all duration-200 shadow-md">
+                        🔄 Scan Another Directory
+                    </button>
+                </div>
+            </div>
+
+            <!-- Success Section -->
+            <div id="successSection" class="hidden text-center">
+                <div class="text-6xl mb-4">✅</div>
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                    Files Organized Successfully!
+                </h2>
+                <p class="text-gray-600 dark:text-gray-400 mb-6 text-base">
+                    <span id="organizedCount">0</span> files have been organized into category folders
+                </p>
+                <button id="organizeAnotherBtn" class="px-6 py-3 bg-primary hover:bg-opacity-90 text-white text-base font-semibold rounded-xl transition-all duration-200 shadow-md">
+                    📂 Organize Another Directory
+                </button>
+            </div>
+        </div>
+
+        <!-- Info Card -->
+        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 slide-in">
+            <h3 class="font-semibold text-blue-900 dark:text-blue-300 mb-2 text-base">ℹ️ How it works</h3>
+            <ul class="text-sm text-blue-800 dark:text-blue-400 space-y-1">
+                <li>• Files are categorized into: Images, Videos, Documents, Audio, Archives, Code, Executables, and Others</li>
+                <li>• Files in subfolders are also detected and organized</li>
+                <li>• Original files are moved (not copied) to their category folders</li>
+                <li>• Category folders are created in the root of the selected directory</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Custom Modal for Messages -->
+    <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl max-w-md w-full mx-4">
+            <p id="modalMessage" class="text-gray-700 dark:text-gray-300 mb-4 text-base"></p>
+            <div class="flex justify-end">
+                <button id="modalCloseBtn" class="px-4 py-2 bg-primary text-white hover:bg-opacity-90 rounded-lg text-base">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dark mode setup
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        // File categories configuration
+        const FILE_CATEGORIES = {
+            'Images': {
+                extensions: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico', 'tiff', 'psd', 'raw'],
+                icon: '🖼️',
+                color: 'text-pink-500'
+            },
+            'Videos': {
+                extensions: ['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'mpeg', 'mpg', '3gp'],
+                icon: '🎬',
+                color: 'text-red-500'
+            },
+            'Documents': {
+                extensions: ['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'md'],
+                icon: '📄',
+                color: 'text-blue-500'
+            },
+            'Audio': {
+                extensions: ['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'aiff'],
+                icon: '🎵',
+                color: 'text-purple-500'
+            },
+            'Archives': {
+                extensions: ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso'],
+                icon: '📦',
+                color: 'text-yellow-500'
+            },
+            'Code': {
+                extensions: ['js', 'py', 'java', 'cpp', 'c', 'cs', 'php', 'html', 'css', 'json', 'xml', 'rb', 'go', 'rs', 'swift', 'kt', 'ts', 'jsx', 'tsx', 'vue', 'sh', 'bat'],
+                icon: '💻',
+                color: 'text-green-500'
+            },
+            'Executables': {
+                extensions: ['exe', 'dmg', 'app', 'deb', 'rpm', 'apk', 'msi'],
+                icon: '⚙️',
+                color: 'text-orange-500'
+            },
+            'Others': {
+                extensions: [],
+                icon: '📋',
+                color: 'text-gray-500'
+            }
+        };
+
+        let directoryHandle = null;
+        let fileMap = new Map();
+
+        // Custom modal functions
+        function showAlert(message) {
+            const modal = document.getElementById('modal');
+            const modalMessage = document.getElementById('modalMessage');
+            modalMessage.textContent = message;
+            modal.classList.remove('hidden');
+        }
+
+        document.getElementById('modalCloseBtn').addEventListener('click', () => {
+            document.getElementById('modal').classList.add('hidden');
+        });
+
+        // Get file category
+        function getFileCategory(fileName) {
+            const ext = fileName.split('.').pop().toLowerCase();
+            for (const [category, data] of Object.entries(FILE_CATEGORIES)) {
+                if (data.extensions.includes(ext)) {
+                    return category;
+                }
+            }
+            return 'Others';
+        }
+
+        // Scan directory recursively
+        async function scanDirectory(dirHandle, path = '') {
+            const files = [];
+            try {
+                for await (const entry of dirHandle.values()) {
+                    const currentPath = path ? `${path}/${entry.name}` : entry.name;
+
+                    if (entry.kind === 'file') {
+                        // Skip hidden files and system files
+                        if (!entry.name.startsWith('.')) {
+                            const category = getFileCategory(entry.name);
+                            files.push({
+                                name: entry.name,
+                                path: currentPath,
+                                category: category,
+                                handle: entry,
+                                parentHandle: dirHandle,
+                                isNested: path !== ''
+                            });
+                        }
+                    } else if (entry.kind === 'directory') {
+                        // Skip category folders we might have created before
+                        if (!Object.keys(FILE_CATEGORIES).includes(entry.name) && !entry.name.startsWith('.')) {
+                            const subFiles = await scanDirectory(entry, currentPath);
+                            files.push(...subFiles);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error scanning directory:', error);
+            }
+            return files;
+        }
+
+        // Display results
+        function displayResults(files) {
+            // Group files by category
+            const categorizedFiles = {};
+            let nestedCount = 0;
+
+            files.forEach(file => {
+                if (!categorizedFiles[file.category]) {
+                    categorizedFiles[file.category] = [];
+                }
+                categorizedFiles[file.category].push(file);
+                if (file.isNested) nestedCount++;
+            });
+
+            // Update summary
+            document.getElementById('totalFiles').textContent = files.length;
+            document.getElementById('categorizedFiles').textContent = files.length;
+            document.getElementById('categoryCount').textContent = Object.keys(categorizedFiles).length;
+            document.getElementById('nestedFiles').textContent = nestedCount;
+
+            // Display categories
+            const container = document.getElementById('categoriesContainer');
+            container.innerHTML = '';
+
+            Object.entries(categorizedFiles).sort((a, b) => b[1].length - a[1].length).forEach(([category, categoryFiles]) => {
+                const categoryData = FILE_CATEGORIES[category];
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm';
+
+                const fileListHTML = categoryFiles.slice(0, 5).map(file => `
+                    <div class="file-item flex items-center text-sm text-gray-600 dark:text-gray-400 py-1">
+                        <span class="mr-2">📄</span>
+                        <span class="truncate">${file.path}</span>
+                    </div>
+                `).join('');
+
+                const moreCount = categoryFiles.length - 5;
+
+                categoryDiv.innerHTML = `
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-3">${categoryData.icon}</span>
+                            <div>
+                                <h3 class="font-semibold text-lg ${categoryData.color}">${category}</h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">${categoryFiles.length} file${categoryFiles.length !== 1 ? 's' : ''}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-1">
+                        ${fileListHTML}
+                        ${moreCount > 0 ? `<div class="text-sm text-gray-500 dark:text-gray-400 py-1">...and ${moreCount} more</div>` : ''}
+                    </div>
+                `;
+
+                container.appendChild(categoryDiv);
+            });
+
+            // Store file map
+            fileMap = categorizedFiles;
+        }
+
+        // Organize files
+        async function organizeFiles() {
+            let totalOrganized = 0;
+
+            try {
+                // Create category folders
+                const categoryFolders = {};
+
+                for (const [category, files] of Object.entries(fileMap)) {
+                    if (files.length === 0) continue;
+
+                    // Create category folder
+                    const folderHandle = await directoryHandle.getDirectoryHandle(category, { create: true });
+                    categoryFolders[category] = folderHandle;
+                }
+
+                // Move files
+                for (const [category, files] of Object.entries(fileMap)) {
+                    const targetFolder = categoryFolders[category];
+                    if (!targetFolder) continue;
+
+                    for (const file of files) {
+                        try {
+                            // Get the file
+                            const fileHandle = await file.parentHandle.getFileHandle(file.name);
+                            const fileData = await fileHandle.getFile();
+
+                            // Create new file in target folder
+                            const newFileHandle = await targetFolder.getFileHandle(file.name, { create: true });
+                            const writable = await newFileHandle.createWritable();
+                            await writable.write(fileData);
+                            await writable.close();
+
+                            // Delete original file
+                            await file.parentHandle.removeEntry(file.name);
+
+                            totalOrganized++;
+                        } catch (error) {
+                            console.error(`Error moving file ${file.name}:`, error);
+                        }
+                    }
+                }
+
+                // Show success
+                document.getElementById('resultsSection').classList.add('hidden');
+                document.getElementById('successSection').classList.remove('hidden');
+                document.getElementById('organizedCount').textContent = totalOrganized;
+
+            } catch (error) {
+                console.error('Error organizing files:', error);
+                showAlert('An error occurred while organizing files. Please try again.');
+            }
+        }
+
+        // Event listeners
+        document.getElementById('selectDirBtn').addEventListener('click', async () => {
+            try {
+                // Check if File System Access API is supported
+                if (!('showDirectoryPicker' in window)) {
+                    showAlert('Your browser does not support the File System Access API. Please use a modern browser like Chrome or Edge.');
+                    return;
+                }
+
+                directoryHandle = await window.showDirectoryPicker({
+                    mode: 'readwrite'
+                });
+
+                // Show loading
+                document.getElementById('selectSection').classList.add('hidden');
+                document.getElementById('loadingSection').classList.remove('hidden');
+
+                // Scan directory
+                const files = await scanDirectory(directoryHandle);
+
+                if (files.length === 0) {
+                    showAlert('No files found in the selected directory.');
+                    document.getElementById('loadingSection').classList.add('hidden');
+                    document.getElementById('selectSection').classList.remove('hidden');
+                    return;
+                }
+
+                // Display results
+                displayResults(files);
+                document.getElementById('loadingSection').classList.add('hidden');
+                document.getElementById('resultsSection').classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Error selecting directory:', error);
+                if (error.name !== 'AbortError') {
+                    showAlert('Error accessing directory. Please make sure you grant the necessary permissions.');
+                }
+                document.getElementById('loadingSection').classList.add('hidden');
+                document.getElementById('selectSection').classList.remove('hidden');
+            }
+        });
+
+        document.getElementById('organizeBtn').addEventListener('click', async () => {
+            // Show loading
+            document.getElementById('resultsSection').classList.add('hidden');
+            document.getElementById('loadingSection').classList.remove('hidden');
+            document.getElementById('loadingSection').querySelector('p').textContent = 'Organizing files...';
+
+            await organizeFiles();
+
+            document.getElementById('loadingSection').classList.add('hidden');
+        });
+
+        document.getElementById('scanAgainBtn').addEventListener('click', () => {
+            document.getElementById('resultsSection').classList.add('hidden');
+            document.getElementById('selectSection').classList.remove('hidden');
+            fileMap = new Map();
+        });
+
+        document.getElementById('organizeAnotherBtn').addEventListener('click', () => {
+            document.getElementById('successSection').classList.add('hidden');
+            document.getElementById('selectSection').classList.remove('hidden');
+            fileMap = new Map();
+        });
+    </script>
+
+
+</body></html>
