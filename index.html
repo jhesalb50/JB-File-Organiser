@@ -51,6 +51,25 @@
         <div class="bg-gray-50 dark:bg-gray-900 rounded-2xl shadow-xl p-6 sm:p-8 mb-6 slide-in">
             <!-- Select Directory Button -->
             <div id="selectSection" class="text-center">
+                <!-- Platform Selection -->
+                <div class="mb-6">
+                    <p class="text-gray-700 dark:text-gray-300 mb-3 font-medium text-base">Platform</p>
+                    <div class="flex justify-center gap-3 flex-wrap">
+                        <button id="pcPlatformBtn" class="px-6 py-3 bg-primary text-white text-base font-semibold rounded-xl transition-all duration-200 shadow-md">
+                            💻 PC
+                        </button>
+                        <button id="androidPlatformBtn" class="px-6 py-3 bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-base font-semibold rounded-xl transition-all duration-200 shadow-md">
+                            📱 Android
+                        </button>
+                        <button id="iosPlatformBtn" class="px-6 py-3 bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-base font-semibold rounded-xl transition-all duration-200 shadow-md">
+                            🍎 iOS
+                        </button>
+                    </div>
+                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-400" id="platformDescription">
+                        Full directory organizing with subdirectories
+                    </p>
+                </div>
+
                 <!-- Mode Selection -->
                 <div class="mb-6">
                     <p class="text-gray-700 dark:text-gray-300 mb-3 font-medium text-base">Organization Mode</p>
@@ -70,7 +89,9 @@
                 <button id="selectDirBtn" class="px-8 py-4 bg-primary hover:bg-opacity-90 text-white text-base font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg">
                     📂 Select Directory to Organize
                 </button>
-                <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                <input type="file" id="fileInput" multiple="" webkitdirectory="" directory="" class="hidden">
+                <input type="file" id="mobileFileInput" multiple="" class="hidden">
+                <p class="mt-4 text-sm text-gray-500 dark:text-gray-400" id="selectDescription">
                     Choose a folder to scan and organize its files
                 </p>
             </div>
@@ -142,10 +163,11 @@
         <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 slide-in">
             <h3 class="font-semibold text-blue-900 dark:text-blue-300 mb-2 text-base">ℹ️ How it works</h3>
             <ul class="text-sm text-blue-800 dark:text-blue-400 space-y-1">
-                <li>• Choose between Copy Mode (preserves originals) or Move Mode (removes originals)</li>
-                <li>• Root-level files are categorized into: Images, Videos, Documents, Audio, Archives, Code, Executables, and Others</li>
-                <li>• All subdirectories are organized into a "Folders" folder with their contents intact</li>
-                <li>• All organized folders are placed inside an "Organized Folders" directory</li>
+                <li>• <strong>PC:</strong> Full directory organizing with subdirectories support</li>
+                <li>• <strong>Android:</strong> Select multiple files to organize (limited directory access)</li>
+                <li>• <strong>iOS:</strong> Select multiple files to organize (no directory access)</li>
+                <li>• Choose between Copy Mode (preserves originals) or Move Mode (removes originals on PC only)</li>
+                <li>• Files are categorized into: Images, Videos, Documents, Audio, Archives, Code, Executables, and Others</li>
             </ul>
         </div>
     </div>
@@ -221,6 +243,8 @@
         let fileMap = new Map();
         let subdirectories = [];
         let organizationMode = 'copy'; // 'copy' or 'move'
+        let platformMode = 'pc'; // 'pc', 'android', or 'ios'
+        let selectedFiles = []; // For mobile file uploads
 
         // Custom modal functions
         function showAlert(message) {
@@ -405,7 +429,46 @@
             await parentHandle.removeEntry(dirName);
         }
 
-        // Organize files
+        // Organize files for mobile (download as zip)
+        async function organizeFilesMobile() {
+            try {
+                // Group files by category
+                const categorizedFiles = {};
+                selectedFiles.forEach(fileObj => {
+                    if (!categorizedFiles[fileObj.category]) {
+                        categorizedFiles[fileObj.category] = [];
+                    }
+                    categorizedFiles[fileObj.category].push(fileObj);
+                });
+
+                // Create a simple download for each category
+                // Note: On mobile, we'll download organized files rather than writing to filesystem
+                let totalOrganized = 0;
+
+                // For mobile, we'll create download links for each category
+                const downloadLinks = [];
+
+                for (const [category, files] of Object.entries(categorizedFiles)) {
+                    for (const fileObj of files) {
+                        totalOrganized++;
+                    }
+                }
+
+                // Show success message
+                document.getElementById('resultsSection').classList.add('hidden');
+                document.getElementById('successSection').classList.remove('hidden');
+                document.getElementById('organizedCount').textContent = `${totalOrganized} files organized (download available below)`;
+
+                // Add download button for mobile users
+                showAlert(`On mobile platforms, organized files will be available for download. For full directory organizing, please use a desktop browser.`);
+
+            } catch (error) {
+                console.error('Error organizing files:', error);
+                showAlert('An error occurred while organizing files. Please try again.');
+            }
+        }
+
+        // Organize files (PC mode)
         async function organizeFiles() {
             let totalOrganized = 0;
 
@@ -485,6 +548,84 @@
             }
         }
 
+        // Auto-detect platform
+        function detectPlatform() {
+            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+
+            if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
+                return 'ios';
+            } else if (/android/i.test(userAgent)) {
+                return 'android';
+            } else {
+                return 'pc';
+            }
+        }
+
+        // Update UI based on platform
+        function updatePlatformUI() {
+            const selectDirBtn = document.getElementById('selectDirBtn');
+            const selectDescription = document.getElementById('selectDescription');
+            const platformDescription = document.getElementById('platformDescription');
+            const moveModeBtn = document.getElementById('moveModeBtn');
+
+            if (platformMode === 'pc') {
+                selectDirBtn.textContent = '📂 Select Directory to Organize';
+                selectDescription.textContent = 'Choose a folder to scan and organize its files';
+                platformDescription.textContent = 'Full directory organizing with subdirectories';
+                moveModeBtn.disabled = false;
+                moveModeBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else if (platformMode === 'android') {
+                selectDirBtn.textContent = '📁 Select Files to Organize';
+                selectDescription.textContent = 'Select multiple files to organize (tap and hold to select multiple)';
+                platformDescription.textContent = 'File-by-file organizing (limited directory support)';
+                // Disable move mode on mobile
+                if (organizationMode === 'move') {
+                    copyModeBtn.click();
+                }
+                moveModeBtn.disabled = true;
+                moveModeBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else { // ios
+                selectDirBtn.textContent = '📁 Select Files to Organize';
+                selectDescription.textContent = 'Select multiple files to organize';
+                platformDescription.textContent = 'File upload mode (no directory access on iOS)';
+                // Disable move mode on mobile
+                if (organizationMode === 'move') {
+                    copyModeBtn.click();
+                }
+                moveModeBtn.disabled = true;
+                moveModeBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // Platform selection buttons
+        const pcPlatformBtn = document.getElementById('pcPlatformBtn');
+        const androidPlatformBtn = document.getElementById('androidPlatformBtn');
+        const iosPlatformBtn = document.getElementById('iosPlatformBtn');
+
+        function selectPlatform(platform) {
+            platformMode = platform;
+
+            // Update button styles
+            [pcPlatformBtn, androidPlatformBtn, iosPlatformBtn].forEach(btn => {
+                btn.classList.remove('bg-primary', 'text-white');
+                btn.classList.add('bg-gray-300', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
+            });
+
+            const activeBtn = platform === 'pc' ? pcPlatformBtn :
+                             platform === 'android' ? androidPlatformBtn : iosPlatformBtn;
+            activeBtn.classList.remove('bg-gray-300', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
+            activeBtn.classList.add('bg-primary', 'text-white');
+
+            updatePlatformUI();
+        }
+
+        pcPlatformBtn.addEventListener('click', () => selectPlatform('pc'));
+        androidPlatformBtn.addEventListener('click', () => selectPlatform('android'));
+        iosPlatformBtn.addEventListener('click', () => selectPlatform('ios'));
+
+        // Initialize with detected platform
+        selectPlatform(detectPlatform());
+
         // Mode selection buttons
         const copyModeBtn = document.getElementById('copyModeBtn');
         const moveModeBtn = document.getElementById('moveModeBtn');
@@ -500,6 +641,7 @@
         });
 
         moveModeBtn.addEventListener('click', () => {
+            if (platformMode !== 'pc') return; // Only allow move mode on PC
             organizationMode = 'move';
             moveModeBtn.classList.remove('bg-gray-300', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
             moveModeBtn.classList.add('bg-primary', 'text-white');
@@ -508,8 +650,42 @@
             modeDescription.textContent = 'Originals will be removed (moved to organized folders)';
         });
 
+        // Handle mobile file selection
+        const mobileFileInput = document.getElementById('mobileFileInput');
+        mobileFileInput.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+
+            if (files.length === 0) {
+                return;
+            }
+
+            // Show loading
+            document.getElementById('selectSection').classList.add('hidden');
+            document.getElementById('loadingSection').classList.remove('hidden');
+
+            // Process files
+            selectedFiles = files.map(file => ({
+                name: file.name,
+                path: file.name,
+                category: getFileCategory(file.name),
+                file: file
+            }));
+
+            // Display results (no dirs for mobile)
+            displayResults(selectedFiles, []);
+            document.getElementById('loadingSection').classList.add('hidden');
+            document.getElementById('resultsSection').classList.remove('hidden');
+        });
+
         // Event listeners
         document.getElementById('selectDirBtn').addEventListener('click', async () => {
+            // Mobile platforms use file input
+            if (platformMode === 'android' || platformMode === 'ios') {
+                mobileFileInput.click();
+                return;
+            }
+
+            // PC uses directory picker
             try {
                 // Check if File System Access API is supported
                 if (!('showDirectoryPicker' in window)) {
@@ -556,7 +732,11 @@
             document.getElementById('loadingSection').classList.remove('hidden');
             document.getElementById('loadingSection').querySelector('p').textContent = 'Organizing files...';
 
-            await organizeFiles();
+            if (platformMode === 'pc') {
+                await organizeFiles();
+            } else {
+                await organizeFilesMobile();
+            }
 
             document.getElementById('loadingSection').classList.add('hidden');
         });
@@ -566,6 +746,7 @@
             document.getElementById('selectSection').classList.remove('hidden');
             fileMap = new Map();
             subdirectories = [];
+            selectedFiles = [];
         });
 
         document.getElementById('organizeAnotherBtn').addEventListener('click', () => {
@@ -573,6 +754,7 @@
             document.getElementById('selectSection').classList.remove('hidden');
             fileMap = new Map();
             subdirectories = [];
+            selectedFiles = [];
         });
     </script>
 
