@@ -51,6 +51,22 @@
         <div class="bg-gray-50 dark:bg-gray-900 rounded-2xl shadow-xl p-6 sm:p-8 mb-6 slide-in">
             <!-- Select Directory Button -->
             <div id="selectSection" class="text-center">
+                <!-- Mode Selection -->
+                <div class="mb-6">
+                    <p class="text-gray-700 dark:text-gray-300 mb-3 font-medium text-base">Organization Mode</p>
+                    <div class="flex justify-center gap-3">
+                        <button id="copyModeBtn" class="px-6 py-3 bg-primary text-white text-base font-semibold rounded-xl transition-all duration-200 shadow-md">
+                            📋 Copy Mode
+                        </button>
+                        <button id="moveModeBtn" class="px-6 py-3 bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-base font-semibold rounded-xl transition-all duration-200 shadow-md">
+                            ➡️ Move Mode
+                        </button>
+                    </div>
+                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-400" id="modeDescription">
+                        Originals will be preserved (copies created)
+                    </p>
+                </div>
+
                 <button id="selectDirBtn" class="px-8 py-4 bg-primary hover:bg-opacity-90 text-white text-base font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg">
                     📂 Select Directory to Organize
                 </button>
@@ -86,8 +102,8 @@
                             <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">Categories</div>
                         </div>
                         <div class="bg-white dark:bg-gray-800 p-4 rounded-lg text-center">
-                            <div class="text-3xl font-bold text-purple-500" id="nestedFiles">0</div>
-                            <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">In Subfolders</div>
+                            <div class="text-3xl font-bold text-purple-500" id="subdirCount">0</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400 mt-1">Subdirectories</div>
                         </div>
                     </div>
                 </div>
@@ -114,7 +130,7 @@
                     Files Organized Successfully!
                 </h2>
                 <p class="text-gray-600 dark:text-gray-400 mb-6 text-base">
-                    <span id="organizedCount">0</span> files have been organized into category folders
+                    <span id="organizedCount">0</span> have been organized
                 </p>
                 <button id="organizeAnotherBtn" class="px-6 py-3 bg-primary hover:bg-opacity-90 text-white text-base font-semibold rounded-xl transition-all duration-200 shadow-md">
                     📂 Organize Another Directory
@@ -126,10 +142,10 @@
         <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 slide-in">
             <h3 class="font-semibold text-blue-900 dark:text-blue-300 mb-2 text-base">ℹ️ How it works</h3>
             <ul class="text-sm text-blue-800 dark:text-blue-400 space-y-1">
-                <li>• Files are categorized into: Images, Videos, Documents, Audio, Archives, Code, Executables, and Others</li>
-                <li>• Files in subfolders are also detected and organized</li>
-                <li>• Original files are moved (not copied) to their category folders</li>
-                <li>• Category folders are created in the root of the selected directory</li>
+                <li>• Choose between Copy Mode (preserves originals) or Move Mode (removes originals)</li>
+                <li>• Root-level files are categorized into: Images, Videos, Documents, Audio, Archives, Code, Executables, and Others</li>
+                <li>• All subdirectories are organized into a "Folders" folder with their contents intact</li>
+                <li>• All organized folders are placed inside an "Organized Folders" directory</li>
             </ul>
         </div>
     </div>
@@ -203,6 +219,8 @@
 
         let directoryHandle = null;
         let fileMap = new Map();
+        let subdirectories = [];
+        let organizationMode = 'copy'; // 'copy' or 'move'
 
         // Custom modal functions
         function showAlert(message) {
@@ -227,64 +245,66 @@
             return 'Others';
         }
 
-        // Scan directory recursively
-        async function scanDirectory(dirHandle, path = '') {
+        // Scan directory (only root level)
+        async function scanDirectory(dirHandle) {
             const files = [];
+            const dirs = [];
             try {
                 for await (const entry of dirHandle.values()) {
-                    const currentPath = path ? `${path}/${entry.name}` : entry.name;
-
                     if (entry.kind === 'file') {
                         // Skip hidden files and system files
                         if (!entry.name.startsWith('.')) {
                             const category = getFileCategory(entry.name);
                             files.push({
                                 name: entry.name,
-                                path: currentPath,
+                                path: entry.name,
                                 category: category,
                                 handle: entry,
-                                parentHandle: dirHandle,
-                                isNested: path !== ''
+                                parentHandle: dirHandle
                             });
                         }
                     } else if (entry.kind === 'directory') {
-                        // Skip category folders we might have created before
-                        if (!Object.keys(FILE_CATEGORIES).includes(entry.name) && !entry.name.startsWith('.')) {
-                            const subFiles = await scanDirectory(entry, currentPath);
-                            files.push(...subFiles);
+                        // Skip category folders, "Folders" folder, and "Organized Folders" we might have created before
+                        if (!Object.keys(FILE_CATEGORIES).includes(entry.name) &&
+                            entry.name !== 'Folders' &&
+                            entry.name !== 'Organized Folders' &&
+                            !entry.name.startsWith('.')) {
+                            dirs.push({
+                                name: entry.name,
+                                handle: entry
+                            });
                         }
                     }
                 }
             } catch (error) {
                 console.error('Error scanning directory:', error);
             }
-            return files;
+            return { files, dirs };
         }
 
         // Display results
-        function displayResults(files) {
+        function displayResults(files, dirs) {
             // Group files by category
             const categorizedFiles = {};
-            let nestedCount = 0;
 
             files.forEach(file => {
                 if (!categorizedFiles[file.category]) {
                     categorizedFiles[file.category] = [];
                 }
                 categorizedFiles[file.category].push(file);
-                if (file.isNested) nestedCount++;
             });
 
             // Update summary
             document.getElementById('totalFiles').textContent = files.length;
             document.getElementById('categorizedFiles').textContent = files.length;
             document.getElementById('categoryCount').textContent = Object.keys(categorizedFiles).length;
-            document.getElementById('nestedFiles').textContent = nestedCount;
+            document.getElementById('subdirCount').textContent = dirs.length;
 
             // Display categories
             const container = document.getElementById('categoriesContainer');
             container.innerHTML = '';
 
+            // Display file categories
             Object.entries(categorizedFiles).sort((a, b) => b[1].length - a[1].length).forEach(([category, categoryFiles]) => {
                 const categoryData = FILE_CATEGORIES[category];
                 const categoryDiv = document.createElement('div');
@@ -318,8 +338,71 @@
                 container.appendChild(categoryDiv);
             });
 
-            // Store file map
+            // Display subdirectories section
+            if (dirs.length > 0) {
+                const foldersDiv = document.createElement('div');
+                foldersDiv.className = 'bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm';
+
+                const dirListHTML = dirs.slice(0, 5).map(dir => `
+                    <div class="file-item flex items-center text-sm text-gray-600 dark:text-gray-400 py-1">
+                        <span class="mr-2">📁</span>
+                        <span class="truncate">${dir.name}/</span>
+                    </div>
+                `).join('');
+
+                const moreDirCount = dirs.length - 5;
+
+                foldersDiv.innerHTML = `
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-3">📁</span>
+                            <div>
+                                <h3 class="font-semibold text-lg text-indigo-500">Folders</h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">${dirs.length} subdirector${dirs.length !== 1 ? 'ies' : 'y'}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-1">
+                        ${dirListHTML}
+                        ${moreDirCount > 0 ? `<div class="text-sm text-gray-500 dark:text-gray-400 py-1">...and ${moreDirCount} more</div>` : ''}
+                    </div>
+                `;
+
+                container.appendChild(foldersDiv);
+            }
+
+            // Store file map and subdirectories
             fileMap = categorizedFiles;
+            subdirectories = dirs;
+        }
+
+        // Copy directory recursively
+        async function copyDirectory(sourceHandle, targetParentHandle, dirName) {
+            const targetHandle = await targetParentHandle.getDirectoryHandle(dirName, { create: true });
+
+            for await (const entry of sourceHandle.values()) {
+                if (entry.kind === 'file') {
+                    const file = await entry.getFile();
+                    const newFileHandle = await targetHandle.getFileHandle(entry.name, { create: true });
+                    const writable = await newFileHandle.createWritable();
+                    await writable.write(file);
+                    await writable.close();
+                } else if (entry.kind === 'directory') {
+                    await copyDirectory(entry, targetHandle, entry.name);
+                }
+            }
+        }
+
+        // Delete directory recursively
+        async function deleteDirectory(dirHandle, parentHandle, dirName) {
+            for await (const entry of dirHandle.values()) {
+                if (entry.kind === 'file') {
+                    await dirHandle.removeEntry(entry.name);
+                } else if (entry.kind === 'directory') {
+                    await deleteDirectory(entry, dirHandle, entry.name);
+                }
+            }
+            await parentHandle.removeEntry(dirName);
         }
 
         // Organize files
@@ -327,18 +410,21 @@
             let totalOrganized = 0;
 
             try {
-                // Create category folders
+                // Create "Organized Folders" parent directory
+                const organizedFoldersHandle = await directoryHandle.getDirectoryHandle('Organized Folders', { create: true });
+
+                // Create category folders inside "Organized Folders"
                 const categoryFolders = {};
 
                 for (const [category, files] of Object.entries(fileMap)) {
                     if (files.length === 0) continue;
 
-                    // Create category folder
-                    const folderHandle = await directoryHandle.getDirectoryHandle(category, { create: true });
+                    // Create category folder inside "Organized Folders"
+                    const folderHandle = await organizedFoldersHandle.getDirectoryHandle(category, { create: true });
                     categoryFolders[category] = folderHandle;
                 }
 
-                // Move files
+                // Organize files to category folders
                 for (const [category, files] of Object.entries(fileMap)) {
                     const targetFolder = categoryFolders[category];
                     if (!targetFolder) continue;
@@ -355,12 +441,35 @@
                             await writable.write(fileData);
                             await writable.close();
 
-                            // Delete original file
-                            await file.parentHandle.removeEntry(file.name);
+                            // If move mode, delete the original
+                            if (organizationMode === 'move') {
+                                await file.parentHandle.removeEntry(file.name);
+                            }
 
                             totalOrganized++;
                         } catch (error) {
-                            console.error(`Error moving file ${file.name}:`, error);
+                            console.error(`Error organizing file ${file.name}:`, error);
+                        }
+                    }
+                }
+
+                // Organize subdirectories to "Folders" folder inside "Organized Folders"
+                if (subdirectories.length > 0) {
+                    const foldersHandle = await organizedFoldersHandle.getDirectoryHandle('Folders', { create: true });
+
+                    for (const dir of subdirectories) {
+                        try {
+                            // Copy directory to Folders
+                            await copyDirectory(dir.handle, foldersHandle, dir.name);
+
+                            // If move mode, delete the original directory
+                            if (organizationMode === 'move') {
+                                await deleteDirectory(dir.handle, directoryHandle, dir.name);
+                            }
+
+                            totalOrganized++;
+                        } catch (error) {
+                            console.error(`Error organizing directory ${dir.name}:`, error);
                         }
                     }
                 }
@@ -368,13 +477,36 @@
                 // Show success
                 document.getElementById('resultsSection').classList.add('hidden');
                 document.getElementById('successSection').classList.remove('hidden');
-                document.getElementById('organizedCount').textContent = totalOrganized;
+                document.getElementById('organizedCount').textContent = `${totalOrganized} items (files and folders)`;
 
             } catch (error) {
                 console.error('Error organizing files:', error);
                 showAlert('An error occurred while organizing files. Please try again.');
             }
         }
+
+        // Mode selection buttons
+        const copyModeBtn = document.getElementById('copyModeBtn');
+        const moveModeBtn = document.getElementById('moveModeBtn');
+        const modeDescription = document.getElementById('modeDescription');
+
+        copyModeBtn.addEventListener('click', () => {
+            organizationMode = 'copy';
+            copyModeBtn.classList.remove('bg-gray-300', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
+            copyModeBtn.classList.add('bg-primary', 'text-white');
+            moveModeBtn.classList.remove('bg-primary', 'text-white');
+            moveModeBtn.classList.add('bg-gray-300', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
+            modeDescription.textContent = 'Originals will be preserved (copies created)';
+        });
+
+        moveModeBtn.addEventListener('click', () => {
+            organizationMode = 'move';
+            moveModeBtn.classList.remove('bg-gray-300', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
+            moveModeBtn.classList.add('bg-primary', 'text-white');
+            copyModeBtn.classList.remove('bg-primary', 'text-white');
+            copyModeBtn.classList.add('bg-gray-300', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
+            modeDescription.textContent = 'Originals will be removed (moved to organized folders)';
+        });
 
         // Event listeners
         document.getElementById('selectDirBtn').addEventListener('click', async () => {
@@ -394,17 +526,17 @@
                 document.getElementById('loadingSection').classList.remove('hidden');
 
                 // Scan directory
-                const files = await scanDirectory(directoryHandle);
+                const { files, dirs } = await scanDirectory(directoryHandle);
 
-                if (files.length === 0) {
-                    showAlert('No files found in the selected directory.');
+                if (files.length === 0 && dirs.length === 0) {
+                    showAlert('No files or folders found in the selected directory.');
                     document.getElementById('loadingSection').classList.add('hidden');
                     document.getElementById('selectSection').classList.remove('hidden');
                     return;
                 }
 
                 // Display results
-                displayResults(files);
+                displayResults(files, dirs);
                 document.getElementById('loadingSection').classList.add('hidden');
                 document.getElementById('resultsSection').classList.remove('hidden');
 
@@ -433,12 +565,14 @@
             document.getElementById('resultsSection').classList.add('hidden');
             document.getElementById('selectSection').classList.remove('hidden');
             fileMap = new Map();
+            subdirectories = [];
         });
 
         document.getElementById('organizeAnotherBtn').addEventListener('click', () => {
             document.getElementById('successSection').classList.add('hidden');
             document.getElementById('selectSection').classList.remove('hidden');
             fileMap = new Map();
+            subdirectories = [];
         });
     </script>
 
