@@ -99,7 +99,18 @@
             <!-- Loading State -->
             <div id="loadingSection" class="hidden text-center">
                 <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
-                <p class="mt-4 text-gray-700 dark:text-gray-300 text-base">Scanning files...</p>
+                <p class="mt-4 text-gray-700 dark:text-gray-300 text-base" id="loadingText">Scanning files...</p>
+                <!-- Progress Bar -->
+                <div id="progressContainer" class="hidden mt-6 max-w-md mx-auto">
+                    <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        <span id="progressText">Processing...</span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                        <div id="progressBar" class="bg-primary h-full transition-all duration-300 ease-out" style="width: 0%"></div>
+                    </div>
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400" id="progressDetail">0 of 0 items</p>
+                </div>
             </div>
 
             <!-- Results Section -->
@@ -137,6 +148,9 @@
                 <div class="flex flex-col sm:flex-row gap-3 justify-center">
                     <button id="organizeBtn" class="px-6 py-3 bg-primary hover:bg-opacity-90 text-white text-base font-semibold rounded-xl transition-all duration-200 shadow-md">
                         ✨ Organize Files
+                    </button>
+                    <button id="customCategoriesBtn" class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white text-base font-semibold rounded-xl transition-all duration-200 shadow-md">
+                        ⚙️ Custom Categories
                     </button>
                     <button id="scanAgainBtn" class="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white text-base font-semibold rounded-xl transition-all duration-200 shadow-md">
                         🔄 Scan Another Directory
@@ -182,6 +196,42 @@
         </div>
     </div>
 
+    <!-- Custom Categories Modal -->
+    <div id="customCategoriesModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4 overflow-y-auto">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl max-w-2xl w-full mx-4 my-8 max-h-[90vh] overflow-y-auto">
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">⚙️ Custom Categories</h2>
+
+            <!-- Add New Category -->
+            <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg mb-4">
+                <h3 class="font-semibold text-gray-900 dark:text-white mb-3 text-base">Create New Category</h3>
+                <div class="flex gap-2 mb-2">
+                    <input type="text" id="newCategoryName" placeholder="Category name" class="flex-1 px-4 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary">
+                    <input type="text" id="newCategoryIcon" placeholder="Icon (emoji)" maxlength="2" class="w-20 px-4 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-center focus:ring-2 focus:ring-primary">
+                </div>
+                <input type="text" id="newCategoryExtensions" placeholder="Extensions (comma-separated, e.g., pdf,doc,txt)" class="w-full px-4 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white mb-2 focus:ring-2 focus:ring-primary">
+                <button id="addCategoryBtn" class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-base font-semibold rounded-lg">
+                    ➕ Add Category
+                </button>
+            </div>
+
+            <!-- Existing Categories -->
+            <div class="mb-4">
+                <h3 class="font-semibold text-gray-900 dark:text-white mb-3 text-base">Manage Categories</h3>
+                <div id="categoriesList" class="space-y-3 max-h-96 overflow-y-auto">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button id="resetCategoriesBtn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-base font-semibold rounded-lg">
+                    🔄 Reset to Default
+                </button>
+                <button id="closeCategoriesBtn" class="px-4 py-2 bg-primary text-white hover:bg-opacity-90 rounded-lg text-base font-semibold">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Dark mode setup
         if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -195,49 +245,60 @@
             }
         });
 
-        // File categories configuration
-        const FILE_CATEGORIES = {
+        // Default file categories configuration
+        const DEFAULT_FILE_CATEGORIES = {
             'Images': {
                 extensions: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico', 'tiff', 'psd', 'raw'],
                 icon: '🖼️',
-                color: 'text-pink-500'
+                color: 'text-pink-500',
+                isDefault: true
             },
             'Videos': {
                 extensions: ['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'mpeg', 'mpg', '3gp'],
                 icon: '🎬',
-                color: 'text-red-500'
+                color: 'text-red-500',
+                isDefault: true
             },
             'Documents': {
                 extensions: ['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'md'],
                 icon: '📄',
-                color: 'text-blue-500'
+                color: 'text-blue-500',
+                isDefault: true
             },
             'Audio': {
                 extensions: ['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'aiff'],
                 icon: '🎵',
-                color: 'text-purple-500'
+                color: 'text-purple-500',
+                isDefault: true
             },
             'Archives': {
                 extensions: ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso'],
                 icon: '📦',
-                color: 'text-yellow-500'
+                color: 'text-yellow-500',
+                isDefault: true
             },
             'Code': {
                 extensions: ['js', 'py', 'java', 'cpp', 'c', 'cs', 'php', 'html', 'css', 'json', 'xml', 'rb', 'go', 'rs', 'swift', 'kt', 'ts', 'jsx', 'tsx', 'vue', 'sh', 'bat'],
                 icon: '💻',
-                color: 'text-green-500'
+                color: 'text-green-500',
+                isDefault: true
             },
             'Executables': {
                 extensions: ['exe', 'dmg', 'app', 'deb', 'rpm', 'apk', 'msi'],
                 icon: '⚙️',
-                color: 'text-orange-500'
+                color: 'text-orange-500',
+                isDefault: true
             },
             'Others': {
                 extensions: [],
                 icon: '📋',
-                color: 'text-gray-500'
+                color: 'text-gray-500',
+                isDefault: true
             }
         };
+
+        // Use in-memory storage for custom categories (localStorage not available in iframe)
+        let FILE_CATEGORIES = JSON.parse(JSON.stringify(DEFAULT_FILE_CATEGORIES));
 
         let directoryHandle = null;
         let fileMap = new Map();
@@ -245,6 +306,38 @@
         let organizationMode = 'copy'; // 'copy' or 'move'
         let platformMode = 'pc'; // 'pc', 'android', or 'ios'
         let selectedFiles = []; // For mobile file uploads
+
+        // Color palette for custom categories
+        const CATEGORY_COLORS = [
+            'text-pink-500', 'text-red-500', 'text-blue-500', 'text-purple-500',
+            'text-yellow-500', 'text-green-500', 'text-orange-500', 'text-indigo-500',
+            'text-teal-500', 'text-cyan-500', 'text-lime-500', 'text-amber-500'
+        ];
+
+        // Save/load categories (in-memory only since storage not available in iframe)
+        // Custom categories will be reset on page refresh
+        function saveCategories() {
+            // Categories are already in memory, no action needed
+        }
+
+        // Progress bar functions
+        function showProgress() {
+            document.getElementById('progressContainer').classList.remove('hidden');
+        }
+
+        function hideProgress() {
+            document.getElementById('progressContainer').classList.add('hidden');
+        }
+
+        function updateProgress(current, total, itemName = '') {
+            const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+            document.getElementById('progressBar').style.width = percent + '%';
+            document.getElementById('progressPercent').textContent = percent + '%';
+            document.getElementById('progressDetail').textContent = `${current} of ${total} items`;
+            if (itemName) {
+                document.getElementById('progressText').textContent = `Processing: ${itemName}`;
+            }
+        }
 
         // Custom modal functions
         function showAlert(message) {
@@ -256,6 +349,106 @@
 
         document.getElementById('modalCloseBtn').addEventListener('click', () => {
             document.getElementById('modal').classList.add('hidden');
+        });
+
+        // Custom Categories Management
+        function renderCategoriesList() {
+            const categoriesList = document.getElementById('categoriesList');
+            categoriesList.innerHTML = '';
+
+            Object.entries(FILE_CATEGORIES).forEach(([name, data]) => {
+                const categoryItem = document.createElement('div');
+                categoryItem.className = 'bg-white dark:bg-gray-700 p-3 rounded-lg border border-gray-200 dark:border-gray-600';
+
+                const extensionsText = data.extensions.length > 0 ? data.extensions.join(', ') : 'All unmatched files';
+
+                categoryItem.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3 flex-1">
+                            <span class="text-2xl">${data.icon}</span>
+                            <div class="flex-1">
+                                <h4 class="font-semibold text-gray-900 dark:text-white">${name}</h4>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">${extensionsText}</p>
+                            </div>
+                        </div>
+                        ${!data.isDefault ? `
+                            <button class="delete-category-btn px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-sm rounded" data-category="${name}">
+                                Delete
+                            </button>
+                        ` : '<span class="text-xs text-gray-400">Default</span>'}
+                    </div>
+                `;
+
+                categoriesList.appendChild(categoryItem);
+            });
+
+            // Add delete event listeners
+            document.querySelectorAll('.delete-category-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const categoryName = e.target.dataset.category;
+                    delete FILE_CATEGORIES[categoryName];
+                    saveCategories();
+                    renderCategoriesList();
+                });
+            });
+        }
+
+        // Open custom categories modal
+        document.getElementById('customCategoriesBtn').addEventListener('click', () => {
+            renderCategoriesList();
+            document.getElementById('customCategoriesModal').classList.remove('hidden');
+        });
+
+        // Close custom categories modal
+        document.getElementById('closeCategoriesBtn').addEventListener('click', () => {
+            document.getElementById('customCategoriesModal').classList.add('hidden');
+        });
+
+        // Add new category
+        document.getElementById('addCategoryBtn').addEventListener('click', () => {
+            const name = document.getElementById('newCategoryName').value.trim();
+            const icon = document.getElementById('newCategoryIcon').value.trim() || '📁';
+            const extensionsInput = document.getElementById('newCategoryExtensions').value.trim();
+
+            if (!name) {
+                showAlert('Please enter a category name');
+                return;
+            }
+
+            if (FILE_CATEGORIES[name]) {
+                showAlert('A category with this name already exists');
+                return;
+            }
+
+            const extensions = extensionsInput ? extensionsInput.split(',').map(e => e.trim().toLowerCase()) : [];
+
+            // Assign a random color
+            const color = CATEGORY_COLORS[Math.floor(Math.random() * CATEGORY_COLORS.length)];
+
+            FILE_CATEGORIES[name] = {
+                extensions: extensions,
+                icon: icon,
+                color: color,
+                isDefault: false
+            };
+
+            saveCategories();
+            renderCategoriesList();
+
+            // Clear inputs
+            document.getElementById('newCategoryName').value = '';
+            document.getElementById('newCategoryIcon').value = '';
+            document.getElementById('newCategoryExtensions').value = '';
+
+            showAlert(`Category "${name}" added successfully!`);
+        });
+
+        // Reset to default categories
+        document.getElementById('resetCategoriesBtn').addEventListener('click', () => {
+            FILE_CATEGORIES = JSON.parse(JSON.stringify(DEFAULT_FILE_CATEGORIES));
+            saveCategories();
+            renderCategoriesList();
+            showAlert('Categories reset to default');
         });
 
         // Get file category
@@ -473,6 +666,17 @@
             let totalOrganized = 0;
 
             try {
+                // Calculate total items
+                let totalFiles = 0;
+                for (const files of Object.values(fileMap)) {
+                    totalFiles += files.length;
+                }
+                const totalItems = totalFiles + subdirectories.length;
+
+                // Show progress bar
+                showProgress();
+                updateProgress(0, totalItems);
+
                 // Create "Organized Folders" parent directory
                 const organizedFoldersHandle = await directoryHandle.getDirectoryHandle('Organized Folders', { create: true });
 
@@ -494,6 +698,9 @@
 
                     for (const file of files) {
                         try {
+                            // Update progress
+                            updateProgress(totalOrganized, totalItems, file.name);
+
                             // Get the file
                             const fileHandle = await file.parentHandle.getFileHandle(file.name);
                             const fileData = await fileHandle.getFile();
@@ -522,6 +729,9 @@
 
                     for (const dir of subdirectories) {
                         try {
+                            // Update progress
+                            updateProgress(totalOrganized, totalItems, dir.name);
+
                             // Copy directory to Folders
                             await copyDirectory(dir.handle, foldersHandle, dir.name);
 
@@ -537,6 +747,10 @@
                     }
                 }
 
+                // Final progress update
+                updateProgress(totalOrganized, totalItems, 'Complete!');
+                hideProgress();
+
                 // Show success
                 document.getElementById('resultsSection').classList.add('hidden');
                 document.getElementById('successSection').classList.remove('hidden');
@@ -544,6 +758,7 @@
 
             } catch (error) {
                 console.error('Error organizing files:', error);
+                hideProgress();
                 showAlert('An error occurred while organizing files. Please try again.');
             }
         }
