@@ -2,10 +2,10 @@
 
 # File Organizer
 
-**Secure, client‑side file organization for modern teams.**  
+Secure, client‑side file organization for modern teams
 No cloud sync. No uploads. Full user control.
 
-**File Organizer** is a browser‑based utility that automatically categorizes and organizes files into structured folders based on type, platform, and custom rules — all executed locally on the user’s device.
+File Organizer is a browser‑based utility that automatically categorizes and organizes files into structured folders based on type, platform, and custom rules — all executed locally on the user’s device.
 
 ---
 
